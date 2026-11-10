@@ -228,17 +228,19 @@ function flameMaterial() {
       uniform float uTime;
       uniform float uIntensity;
       void main() {
-        float along = vUv.y;               // 1 at nozzle, 0 at tail
+        float along = clamp(vUv.y, 0.0, 1.0); // 1 at nozzle, 0 at tail
         float flick = 0.85 + 0.15 * sin(uTime * 61.0 + vUv.x * 40.0);
         vec3 hot = vec3(1.6, 1.45, 1.2);
         vec3 mid = vec3(1.9, 0.85, 0.28);
         vec3 tail = vec3(0.9, 0.25, 0.08);
         vec3 col = mix(tail, mid, smoothstep(0.0, 0.55, along));
         col = mix(col, hot, smoothstep(0.7, 1.0, along));
-        float a = pow(along, 1.4) * flick * uIntensity;
+        float a = pow(max(along, 1e-4), 1.4) * clamp(flick, 0.0, 1.0) * clamp(uIntensity, 0.0, 1.0);
         // mach diamond hints
         a *= 0.8 + 0.2 * smoothstep(0.4, 1.0, sin(along * 34.0));
-        gl_FragColor = vec4(col * a * 1.6, a);
+        a = clamp(a, 0.0, 1.0);
+        if (a < 0.002) discard;
+        gl_FragColor = vec4(min(col * a * 1.6, vec3(4.0)), a);
       }`,
   });
 }
