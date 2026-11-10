@@ -335,17 +335,23 @@ function Smoke() {
           varying float vAlpha; varying float vHeat;
           uniform float uScale;
           void main() {
-            vAlpha = aAlpha; vHeat = aHeat;
             vec4 mv = modelViewMatrix * vec4(position, 1.0);
-            gl_PointSize = aSize * uScale / max(-mv.z, 0.1);
+            float dist = max(-mv.z, 0.1);
+            vHeat = clamp(aHeat, 0.0, 1.0);
+            // fade puffs that drift right up to the lens so they never blanket the view
+            vAlpha = clamp(aAlpha, 0.0, 1.0) * clamp((dist - 4.0) / 30.0, 0.0, 1.0);
+            gl_PointSize = clamp(aSize * uScale / dist, 0.0, 512.0);
             gl_Position = projectionMatrix * mv;
           }`,
         fragmentShader: /* glsl */ `
           varying float vAlpha; varying float vHeat;
           void main() {
             float d = length(gl_PointCoord - 0.5);
-            float a = smoothstep(0.5, 0.0, d);
+            // smoothstep needs edge0 < edge1 — reversed edges are undefined in GLSL and
+            // return NaN on Apple GPUs, which the bloom pass smears into black blocks.
+            float a = 1.0 - smoothstep(0.0, 0.5, d);
             a = a * a * vAlpha;
+            if (a < 0.003) discard;
             vec3 smokeCol = vec3(0.5, 0.5, 0.52);
             vec3 fire = vec3(1.5, 0.78, 0.34);
             gl_FragColor = vec4(mix(smokeCol, fire, vHeat), a);
